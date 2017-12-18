@@ -343,6 +343,9 @@ namespace Falcor
 
         // Don't actually perform semantic checking: just pass through functions bodies to downstream compiler
         slangFlags |= SLANG_COMPILE_FLAG_NO_CHECKING | SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
+
+        slangFlags |= SLANG_COMPILE_FLAG_USE_IR;
+
         spSetCompileFlags(slangRequest, slangFlags);
 
         // Now lets add all our input shader code, one-by-one
