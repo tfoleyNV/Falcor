@@ -143,6 +143,7 @@ void _fn prepareShadingAttribs(MaterialData material, in float3 P, in float3 cam
     shAttr.aoFactor = 1;
 
     /* Prefetch textures */
+#if 0
     loop_unroll
     for(uint iLayer = 0 ; iLayer < MatMaxLayers ; iLayer++)
     {
@@ -151,6 +152,22 @@ void _fn prepareShadingAttribs(MaterialData material, in float3 P, in float3 cam
         shAttr.preparedMat.values.layers[iLayer].albedo = 
             evalWithColor(desc.layers[iLayer].hasTexture, material.textures.layers[iLayer], material.samplerState, material.values.layers[iLayer].albedo, shAttr);
     }
+#else
+    // SLANG: need to explicitly unroll to make IR emit
+    // code that keeps fxc happy
+    bool done = false;
+    $for(iLayer in Range(0, MatMaxLayers))
+    {
+        if(shAttr.preparedMat.desc.layers[iLayer].type == MatNone)
+            done = true;
+
+        if( !done )
+        {
+            shAttr.preparedMat.values.layers[iLayer].albedo = 
+                evalWithColor(desc.layers[iLayer].hasTexture, material.textures.layers[iLayer], material.samplerState, material.values.layers[iLayer].albedo, shAttr);
+        }
+    }
+#endif
 
     /* Perturb shading normal is needed */
     perturbNormal(material, shAttr);
@@ -416,12 +433,25 @@ void _fn evalMaterial(
     passResult.specularIllumination = 0;
     passResult.roughness = 0;
     passResult.effectiveRoughness = 0;
+
+#if 0
     [unroll]
     for(uint iLayer = 0 ; iLayer < MatMaxLayers ; iLayer++)
     {
         if(shAttr.preparedMat.desc.layers[iLayer].type == MatNone) break;
         evalMaterialLayer(iLayer, shAttr, lAttr, passResult);
     }
+#else
+    bool done = false;
+    $for(iLayer in Range(0, MatMaxLayers))
+    {
+        if(shAttr.preparedMat.desc.layers[iLayer].type == MatNone) done = true;
+        if( !done )
+        {
+            evalMaterialLayer(iLayer, shAttr, lAttr, passResult);
+        }
+    }
+#endif
 
     /* Accumulate the results of the pass */
     result.finalValue += passResult.value;

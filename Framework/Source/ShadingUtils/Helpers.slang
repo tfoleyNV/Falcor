@@ -289,6 +289,7 @@ void applyLeanMap(in Texture2D leanMap, in SamplerState samplerState, inout Shad
     // Reconstruct the diagonal covariance matrix
     float2 maxCov = max((0), M - B*B);     // Use only diagonal of covariance due to float2 aniso roughness
 
+#if 0
     [unroll]
     for (uint iLayer = 0; iLayer < MatMaxLayers; iLayer++)
     {
@@ -301,6 +302,23 @@ void applyLeanMap(in Texture2D leanMap, in SamplerState samplerState, inout Shad
             shAttr.preparedMat.values.layers[iLayer].roughness.rg = roughness;
         }
     }
+#else
+    bool done = false;
+    $for(iLayer in Range(0,MatMaxLayers))
+    {
+        if (shAttr.preparedMat.desc.layers[iLayer].type == MatNone) done = true;
+
+        if(!done)
+        {
+            if (shAttr.preparedMat.desc.layers[iLayer].type != MatLambert)
+            {
+                float2 roughness = shAttr.preparedMat.values.layers[iLayer].roughness.xy;
+                roughness = sqrt(roughness*roughness + maxCov); // Approximate convolution that works for all
+                shAttr.preparedMat.values.layers[iLayer].roughness.rg = roughness;
+            }
+        }
+    }
+#endif
 }
 
 void perturbNormal(MaterialData mat, inout ShadingAttribs shAttr, bool forceSample)
