@@ -25,7 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
-#include "FeatureDemoCommon.hlsli"
+import FeatureDemoCommon;
+#include "VertexAttrib.h"
 
 MainVsOut main(VS_IN vIn)
 {

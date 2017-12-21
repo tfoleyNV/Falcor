@@ -25,9 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
-__import ShaderCommon;
-__import DefaultVS;
-__import Effects.CascadedShadowMap;
+__exported import ShaderCommon;
+__exported import DefaultVS;
+__exported import Effects.CascadedShadowMap;
 #include "VertexAttrib.h"
 
 layout(binding = 0) cbuffer PerFrameCB : register(b0)

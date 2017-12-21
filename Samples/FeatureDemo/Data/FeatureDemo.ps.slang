@@ -25,11 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
-#include "FeatureDemoCommon.hlsli"
+import FeatureDemoCommon;
 
-__import BSDFs;
-__import Shading;
-__import Helpers;
+import BSDFs;
+import Shading;
+import Helpers;
+
+#include "VertexAttrib.h"
 
 layout(set = 1, binding = 0) Texture2D gEnvMap;
 layout(set = 1, binding = 1) SamplerState gSampler;

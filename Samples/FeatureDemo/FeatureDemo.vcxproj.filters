@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Data\FeatureDemoCommon.hlsli">
-      <Filter>Data</Filter>
-    </None>
     <None Include="Data\FeatureDemo.ps.slang">
       <Filter>Data</Filter>
     </None>
@@ -31,6 +28,9 @@
       <Filter>Data</Filter>
     </None>
     <None Include="Data\DepthPass.ps.slang">
+      <Filter>Data</Filter>
+    </None>
+    <None Include="Data\FeatureDemoCommon.slang">
       <Filter>Data</Filter>
     </None>
   </ItemGroup>

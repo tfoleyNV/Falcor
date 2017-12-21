@@ -30,7 +30,7 @@
     <None Include="Data\FeatureDemo.ps.slang">
       <FileType>Document</FileType>
     </None>
-    <None Include="Data\FeatureDemoCommon.hlsli" />
+    <None Include="Data\FeatureDemoCommon.slang" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Data\FeatureDemo.vs.slang">
