@@ -26,12 +26,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
 #include "Framework.h"
+#include "Graphics/Program/Program.h"
 #include "Graphics/Program/ProgramVersion.h"
 #include "Graphics/Material/MaterialSystem.h"
 
 namespace Falcor
 {
-    ProgramVersion::ProgramVersion(const Shader::SharedPtr& pVS, const Shader::SharedPtr& pPS, const Shader::SharedPtr& pGS, const Shader::SharedPtr& pHS, const Shader::SharedPtr& pDS, const Shader::SharedPtr& pCS, const std::string& name) : mName(name)
+    ProgramKernels::ProgramKernels(const Shader::SharedPtr& pVS, const Shader::SharedPtr& pPS, const Shader::SharedPtr& pGS, const Shader::SharedPtr& pHS, const Shader::SharedPtr& pDS, const Shader::SharedPtr& pCS, const std::string& name) : mName(name)
     {
         mpShaders[(uint32_t)ShaderType::Vertex] = pVS;
         mpShaders[(uint32_t)ShaderType::Pixel] = pPS;
@@ -41,7 +42,7 @@ namespace Falcor
         mpShaders[(uint32_t)ShaderType::Compute] = pCS;
     }
 
-    ProgramVersion::SharedPtr ProgramVersion::create(
+    ProgramKernels::SharedPtr ProgramKernels::create(
         ProgramReflection::SharedPtr const& pReflector,
         const Shader::SharedPtr& pVS,
         const Shader::SharedPtr& pPS,
@@ -57,7 +58,7 @@ namespace Falcor
             log = "Program " + name + " doesn't contain a vertex-shader. This is illegal.";
             return nullptr;
         }
-        SharedPtr pProgram = SharedPtr(new ProgramVersion(pVS, pPS, pGS, pHS, pDS, nullptr, name));
+        SharedPtr pProgram = SharedPtr(new ProgramKernels(pVS, pPS, pGS, pHS, pDS, nullptr, name));
 
         if(pProgram->init(log) == false)
         {
@@ -72,7 +73,7 @@ namespace Falcor
         return pProgram;
     }
 
-    ProgramVersion::SharedPtr ProgramVersion::create(
+    ProgramKernels::SharedPtr ProgramKernels::create(
         ProgramReflection::SharedPtr const& pReflector,
         const Shader::SharedPtr& pCS,
         std::string& log,
@@ -84,7 +85,7 @@ namespace Falcor
             log = "Program " + name + " doesn't contain a compute-shader. This is illegal.";
             return nullptr;
         }
-        SharedPtr pProgram = SharedPtr(new ProgramVersion(nullptr, nullptr, nullptr, nullptr, nullptr, pCS, name));
+        SharedPtr pProgram = SharedPtr(new ProgramKernels(nullptr, nullptr, nullptr, nullptr, nullptr, pCS, name));
 
         if (pProgram->init(log) == false)
         {
@@ -98,9 +99,82 @@ namespace Falcor
         return pProgram;
     }
 
-    ProgramVersion::~ProgramVersion()
+    ProgramKernels::~ProgramKernels()
     {
-        MaterialSystem::removeProgramVersion(this);
+        // BEGIN SLANG
+        //
+        // Disabling this. I don't see what point it serves any more.
+        //
+//        MaterialSystem::removeProgramVersion(this);
+        //
+        // END SLANG
         deleteApiHandle();
+    }
+
+    ProgramVersion::SharedPtr ProgramVersion::create(
+        std::shared_ptr<Program>     const& pProgram,
+        DefineList                   const& defines,
+        ProgramReflection::SharedPtr const& pReflector,
+        std::string                  const& name)
+    {
+        return SharedPtr(new ProgramVersion(pProgram, defines, pReflector, name));
+    }
+
+    ProgramVersion::ProgramVersion(
+        std::shared_ptr<Program>     const& pProgram,
+        DefineList                   const& defines,
+        ProgramReflection::SharedPtr const& pReflector,
+        std::string                  const& name)
+        : mpProgram(pProgram)
+        , mDefines(defines)
+        , mpReflector(pReflector)
+        , mName(name)
+    {}
+
+    ProgramKernels::SharedConstPtr ProgramVersion::getKernels(ProgramVars const* pVars) const
+    {
+        // TODO: need a caching layer here, which takes into account:
+        //
+        // - The types of any shader components bound to `pVars`
+        // - Any active `#define`s set on `pVars`
+        //
+        // For now we just cache one copy of things, since specialization
+        // based on `ProgramVars` isn't implemented yet.
+        //
+
+        if( mpKernels )
+        {
+            return mpKernels;
+        }
+
+        // Loop so that user can trigger recompilation on error
+        for(;;)
+        {
+            std::string log;
+            auto kernels = mpProgram->preprocessAndCreateProgramKernels(this, pVars, log);
+            if( kernels )
+            {
+                // Success.
+                mpKernels = kernels;
+                return kernels;
+            }
+            else
+            {
+                // Failure
+
+                std::string error = std::string("Program Linkage failed.\n\n");
+                error += getName() + "\n";
+                error += log;
+
+                if(msgBox(error, MsgBoxType::RetryCancel) == MsgBoxButton::Cancel)
+                {
+                    // User has chosen not to retry
+                    logError(error);
+                    return nullptr;
+                }
+
+                // Continue loop to keep trying...
+            }
+        }
     }
 }

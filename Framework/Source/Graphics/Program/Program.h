@@ -31,6 +31,8 @@
 #include <vector>
 #include "Graphics/Program//ProgramVersion.h"
 
+struct SlangCompileRequest;
+
 namespace Falcor
 {
     class Shader;
@@ -218,13 +220,23 @@ namespace Falcor
         void replaceAllDefines(const DefineList& dl) { mDefineList = dl; }
 
     protected:
+        friend class ProgramVersion;
+
         Program();
 
         void init(Desc const& desc, DefineList const& programDefines);
 
         bool link() const;
+
+        SlangCompileRequest* createSlangCompileRequest(DefineList const& defines) const;
+        int Program::doSlangCompilation(SlangCompileRequest* slangRequest, std::string& log) const;
+
         ProgramVersion::SharedPtr preprocessAndCreateProgramVersion(std::string& log) const;
-        virtual ProgramVersion::SharedPtr createProgramVersion(std::string& log, const Shader::Blob shaderBlob[kShaderCount]) const;
+        ProgramKernels::SharedPtr preprocessAndCreateProgramKernels(
+            ProgramVersion const* pVersion,
+            ProgramVars    const* pVars,
+            std::string         & log) const;
+        virtual ProgramKernels::SharedPtr createProgramKernels(std::string& log, const Shader::Blob shaderBlob[kShaderCount]) const;
 
         // The description used to create this program
         Desc mDesc;

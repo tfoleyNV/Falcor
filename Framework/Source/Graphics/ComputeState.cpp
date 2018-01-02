@@ -40,12 +40,12 @@ namespace Falcor
 
     ComputeStateObject::SharedPtr ComputeState::getCSO(const ComputeVars* pVars)
     {
-        ProgramVersion::SharedConstPtr pProgVersion = mpProgram ? mpProgram->getActiveVersion() : nullptr;
-        bool newProgram = (pProgVersion.get() != mCachedData.pProgramVersion);
+        ProgramKernels::SharedConstPtr pProgramKernels = mpProgram ? mpProgram->getActiveVersion()->getKernels(pVars) : nullptr;
+        bool newProgram = (pProgramKernels.get() != mCachedData.pProgramKernels);
         if (newProgram)
         {
-            mCachedData.pProgramVersion = pProgVersion.get();
-            mpCsoGraph->walk((void*)mCachedData.pProgramVersion);
+            mCachedData.pProgramKernels = pProgramKernels.get();
+            mpCsoGraph->walk((void*)mCachedData.pProgramKernels);
         }
 
         RootSignature::SharedPtr pRoot = pVars ? pVars->getRootSignature() : RootSignature::getEmpty();
@@ -60,7 +60,7 @@ namespace Falcor
 
         if(pCso == nullptr)
         {
-            mDesc.setProgramVersion(pProgVersion);
+            mDesc.setProgramKernels(pProgramKernels);
             mDesc.setRootSignature(pRoot);
 
             StateGraph::CompareFunc cmpFunc = [&desc = mDesc](ComputeStateObject::SharedPtr pCso) -> bool
