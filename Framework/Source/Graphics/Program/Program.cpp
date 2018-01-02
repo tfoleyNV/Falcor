@@ -288,7 +288,7 @@ namespace Falcor
         }
     }
 
-    ProgramVersion::SharedPtr Program::preprocessAndCreateProgramVersion(std::string& log) const
+    SlangCompileRequest* Program::createSlangCompileRequest(DefineList const& defines) const
     {
         mFileTimeMap.clear();
 
@@ -318,7 +318,7 @@ namespace Falcor
 
         // Pass any `#define` flags along to Slang, since we aren't doing our
         // own preprocessing any more.
-        for(auto shaderDefine : mDefineList)
+        for(auto shaderDefine : defines)
         {
             spAddPreprocessorDefine(slangRequest, shaderDefine.first.c_str(), shaderDefine.second.c_str());
         }
@@ -357,7 +357,7 @@ namespace Falcor
             // language that the shader code is written in (rather than
             // assuming it is a match for the target graphics API).
             SlangSourceLanguage translationUnitSourceLanguage = sourceLanguage;
-            if( source.kind == Desc::Source::Kind::File )
+            if( source.kind == Program::Desc::Source::Kind::File )
             {
                 static const struct
                 {
@@ -385,7 +385,7 @@ namespace Falcor
             translationUnitsAdded++;
 
             // Add source code to the translation unit
-            if ( source.kind == Desc::Source::Kind::File )
+            if ( source.kind == Program::Desc::Source::Kind::File )
             {
                 std::string fullpath;
                 findFileInDataDirectories(source.value, fullpath);
@@ -421,13 +421,56 @@ namespace Falcor
                 spFindProfile(slangSession, getSlangTargetString(ShaderType(i))));
         }
 
+        return slangRequest;
+    }
+
+    int Program::doSlangCompilation(SlangCompileRequest* slangRequest, std::string& log) const
+    {
         int anySlangErrors = spCompile(slangRequest);
         log += spGetDiagnosticOutput(slangRequest);
         if(anySlangErrors)
         {
             spDestroyCompileRequest(slangRequest);
-            return nullptr;
+            return 1;
         }
+
+        // Extract the reflection data
+        mPreprocessedReflector = ProgramReflection::create(slang::ShaderReflection::get(slangRequest), log);
+
+        // Extract list of files referenced, for dependency-tracking purposes
+        int depFileCount = spGetDependencyFileCount(slangRequest);
+        for(int ii = 0; ii < depFileCount; ++ii)
+        {
+            std::string depFilePath = spGetDependencyFilePath(slangRequest, ii);
+            mFileTimeMap[depFilePath] = getFileModifiedTime(depFilePath);
+        }
+
+        return 0;
+    }
+
+    ProgramVersion::SharedPtr Program::preprocessAndCreateProgramVersion(std::string& log) const
+    {
+        SlangCompileRequest* slangRequest = createSlangCompileRequest(mDefineList);
+
+        int anyErrors = doSlangCompilation(slangRequest, log);
+        if(anyErrors)
+            return nullptr;
+
+        return ProgramVersion::create(const_cast<Program*>(this)->shared_from_this(), mDefineList, mPreprocessedReflector, getProgramDescString());
+    }
+
+    ProgramKernels::SharedPtr Program::preprocessAndCreateProgramKernels(
+        ProgramVersion const* pVersion,
+        ProgramVars    const* pVars,
+        std::string         & log) const
+    {
+        SlangCompileRequest* slangRequest = createSlangCompileRequest(pVersion->getDefines());
+
+        // TODO: bind type parameters as needed based on `pVars`
+
+        int anyErrors = doSlangCompilation(slangRequest, log);
+        if(anyErrors)
+            return nullptr;
 
         // Extract the generated code for each stage
         int entryPointCounter = 0;
@@ -455,25 +498,14 @@ namespace Falcor
 #endif
         }
 
-        // Extract the reflection data
-        mPreprocessedReflector = ProgramReflection::create(slang::ShaderReflection::get(slangRequest), log);
-
-        // Extract list of files referenced, for dependency-tracking purposes
-        int depFileCount = spGetDependencyFileCount(slangRequest);
-        for(int ii = 0; ii < depFileCount; ++ii)
-        {
-            std::string depFilePath = spGetDependencyFilePath(slangRequest, ii);
-            mFileTimeMap[depFilePath] = getFileModifiedTime(depFilePath);
-        }
-
         spDestroyCompileRequest(slangRequest);
 
         // Now that we've preprocessed things, dispatch to the actual program creation logic,
         // which may vary in subclasses of `Program`
-        return createProgramVersion(log, shaderBlob);
+        return createProgramKernels(log, shaderBlob);
     }
 
-    ProgramVersion::SharedPtr Program::createProgramVersion(std::string& log, const Shader::Blob shaderBlob[kShaderCount]) const
+    ProgramKernels::SharedPtr Program::createProgramKernels(std::string& log, const Shader::Blob shaderBlob[kShaderCount]) const
     {
         // create the shaders
         Shader::SharedPtr shaders[kShaderCount] = {};
@@ -488,13 +520,13 @@ namespace Falcor
 
         if (shaders[(uint32_t)ShaderType::Compute])
         {
-            return ProgramVersion::create(
+            return ProgramKernels::create(
                 mPreprocessedReflector,
                 shaders[(uint32_t)ShaderType::Compute], log, getProgramDescString());
         }
         else
         {
-            return ProgramVersion::create(
+            return ProgramKernels::create(
                 mPreprocessedReflector,
                 shaders[(uint32_t)ShaderType::Vertex],
                 shaders[(uint32_t)ShaderType::Pixel],
