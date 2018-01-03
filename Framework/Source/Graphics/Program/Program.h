@@ -38,6 +38,11 @@ namespace Falcor
     class Shader;
     class RenderContext;
 
+    enum CompilePurpose
+    {
+        ReflectionOnly, CodeGen
+    };
+
     /** High-level abstraction of a program class.
         This class manages different versions of the same program. Different versions means same shader files, different macro definitions. This allows simple usage in case different macros are required - for example static vs. animated models.
     */
@@ -228,7 +233,7 @@ namespace Falcor
 
         bool link() const;
 
-        SlangCompileRequest* createSlangCompileRequest(DefineList const& defines) const;
+        SlangCompileRequest* createSlangCompileRequest(DefineList const& defines, CompilePurpose purpose) const;
         int Program::doSlangCompilation(SlangCompileRequest* slangRequest, std::string& log) const;
 
         ProgramVersion::SharedPtr preprocessAndCreateProgramVersion(std::string& log) const;

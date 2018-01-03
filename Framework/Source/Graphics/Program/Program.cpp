@@ -288,7 +288,7 @@ namespace Falcor
         }
     }
 
-    SlangCompileRequest* Program::createSlangCompileRequest(DefineList const& defines) const
+    SlangCompileRequest* Program::createSlangCompileRequest(DefineList const& defines, CompilePurpose purpose) const
     {
         mFileTimeMap.clear();
 
@@ -345,6 +345,11 @@ namespace Falcor
         slangFlags |= SLANG_COMPILE_FLAG_NO_CHECKING | SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
 
         slangFlags |= SLANG_COMPILE_FLAG_USE_IR;
+
+        // If we are compiling for reflection data only, skip code generation step
+        // so that the compiler does not complain about missing global type arguments
+        if (purpose == CompilePurpose::ReflectionOnly)
+            slangFlags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
 
         spSetCompileFlags(slangRequest, slangFlags);
 
@@ -450,7 +455,7 @@ namespace Falcor
 
     ProgramVersion::SharedPtr Program::preprocessAndCreateProgramVersion(std::string& log) const
     {
-        SlangCompileRequest* slangRequest = createSlangCompileRequest(mDefineList);
+        SlangCompileRequest* slangRequest = createSlangCompileRequest(mDefineList, CompilePurpose::ReflectionOnly);
 
         int anyErrors = doSlangCompilation(slangRequest, log);
         if(anyErrors)
@@ -464,7 +469,7 @@ namespace Falcor
         ProgramVars    const* pVars,
         std::string         & log) const
     {
-        SlangCompileRequest* slangRequest = createSlangCompileRequest(pVersion->getDefines());
+        SlangCompileRequest* slangRequest = createSlangCompileRequest(pVersion->getDefines(), CompilePurpose::CodeGen);
 
         // TODO: bind type parameters as needed based on `pVars`
 
