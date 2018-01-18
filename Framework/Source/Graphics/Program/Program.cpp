@@ -259,6 +259,66 @@ namespace Falcor
         return slangSession;
     }
 
+    static SlangLinkage* createSlangLinkage()
+    {
+        // We are going to use a single linkage to load and store
+        // all of the shared shader library code. That means that
+        // all user shaders that `import` a library module like
+        // `Shading` will share a single copy of that module.
+        //
+        // For that to work, all of the compilation state that needs
+        // to be shared across modules needs to be registered with
+        // the linkage, instead of with individual compile requests.
+        //
+
+        SlangLinkage* slangLinkage = spCreateLinkage(getSlangSession());
+
+        // The paths to use for loading other `import`ed modules
+        // will be part of the shared state. That means that any search
+        // paths added after the first shaders get compiled won't
+        // end up being respected.
+        //
+        // TODO: is that an issue?
+        for (auto path : getDataDirectoriesList())
+        {
+            spLinkage_AddSearchPath(slangLinkage, path.c_str());
+        }
+
+        // TODO: if there are any global `#define`s that need to be set
+        // across the entire codebase, then they should be set here.
+
+        // In order to generate reflection information that is approrpiate
+        // to the target, we need to register the target with the linkage.
+        //
+#ifdef FALCOR_VK
+        spLinkage_AddCodeGenTarget(slangLinkage, SLANG_SPIRV);
+        spLinkage_AddPreprocessorDefine(slangLinkage, "FALCOR_GLSL", "1");
+#elif defined FALCOR_D3D
+        // Note: we could compile Slang directly to DXBC (by having Slang invoke the MS compiler for us,
+        // but that path seems to have more issues at present, so let's just go to HLSL instead...)
+        spLinkage_AddCodeGenTarget(slangLinkage, SLANG_HLSL);
+        spLinkage_AddPreprocessorDefine(slangLinkage, "FALCOR_HLSL", "1");
+#else
+#error unknown shader compilation target
+#endif
+
+        // We also need to set some compilation options globally.
+
+        SlangCompileFlags slangFlags = 0;
+        slangFlags |= SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
+        slangFlags |= SLANG_COMPILE_FLAG_USE_IR;
+
+        spLinkage_SetCompileFlags(slangLinkage, slangFlags);
+
+        return slangLinkage;
+    }
+
+    SlangLinkage* getSlangLinkage()
+    {
+        static SlangLinkage* slangLinkage = createSlangLinkage();
+        return slangLinkage;
+    }
+
     void loadSlangBuiltins(char const* name, char const* text)
     {
         spAddBuiltins(getSlangSession(), name, text);
@@ -302,6 +362,10 @@ namespace Falcor
 
         // Start building a request for compilation
         SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
+
+        // Ensure that this compile request will share any `import`ed modules
+        // with other compile requests from the same session.
+        spSetLinkageForImports(slangRequest, getSlangLinkage());
 
         // Add our media search paths as `#include` search paths for Slang.
         //
@@ -461,7 +525,19 @@ namespace Falcor
         if(anyErrors)
             return nullptr;
 
-        return ProgramVersion::create(const_cast<Program*>(this)->shared_from_this(), mDefineList, mPreprocessedReflector, getProgramDescString());
+        // Note: we do *not* destroy the Slang compilation request here,
+        // because it contains intermediate data from the front-end
+        // compilation that we will want to re-use across multiple
+        // back-end compilation passes (that is, we will be able
+        // to amortize out the work that went into generating
+        // the IR).
+
+        return ProgramVersion::create(
+            const_cast<Program*>(this)->shared_from_this(),
+            mDefineList,
+            slangRequest,
+            mPreprocessedReflector,
+            getProgramDescString());
     }
 
     ProgramKernels::SharedPtr Program::preprocessAndCreateProgramKernels(
@@ -469,6 +545,10 @@ namespace Falcor
         ProgramVars    const* pVars,
         std::string         & log) const
     {
+        // TODO: we want to "bootstrap" the compile request using
+        // the existing data from the program version.
+        //
+
         SlangCompileRequest* slangRequest = createSlangCompileRequest(pVersion->getDefines(), CompilePurpose::CodeGen);
 
         // TODO: bind type parameters as needed based on `pVars`

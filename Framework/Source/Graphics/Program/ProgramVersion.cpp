@@ -114,19 +114,22 @@ namespace Falcor
     ProgramVersion::SharedPtr ProgramVersion::create(
         std::shared_ptr<Program>     const& pProgram,
         DefineList                   const& defines,
+        SlangCompileRequest               * pSlangRequest,
         ProgramReflection::SharedPtr const& pReflector,
         std::string                  const& name)
     {
-        return SharedPtr(new ProgramVersion(pProgram, defines, pReflector, name));
+        return SharedPtr(new ProgramVersion(pProgram, defines, pSlangRequest, pReflector, name));
     }
 
     ProgramVersion::ProgramVersion(
         std::shared_ptr<Program>     const& pProgram,
         DefineList                   const& defines,
+        SlangCompileRequest               * pSlangRequest,
         ProgramReflection::SharedPtr const& pReflector,
         std::string                  const& name)
         : mpProgram(pProgram)
         , mDefines(defines)
+        , mpSlangRequest(pSlangRequest)
         , mpReflector(pReflector)
         , mName(name)
     {}

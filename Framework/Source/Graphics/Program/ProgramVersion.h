@@ -125,6 +125,7 @@ namespace Falcor
         static SharedPtr create(
             std::shared_ptr<Program>     const& pProgram,
             DefineList                   const& defines,
+            SlangCompileRequest               * pSlangRequest,
             ProgramReflection::SharedPtr const& pReflector,
             std::string                  const& name = "");
 
@@ -152,11 +153,13 @@ namespace Falcor
         ProgramVersion(
             std::shared_ptr<Program>     const& pProgram,
             DefineList                   const& defines,
+            SlangCompileRequest               * pSlangRequest,
             ProgramReflection::SharedPtr const& pReflector,
             std::string                  const& name);
 
         std::shared_ptr<Program>        mpProgram;
         DefineList                      mDefines;
+        SlangCompileRequest*            mpSlangRequest;
         ProgramReflection::SharedPtr    mpReflector;
         std::string                     mName;
 
