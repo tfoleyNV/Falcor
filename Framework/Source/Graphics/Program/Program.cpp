@@ -333,6 +333,8 @@ namespace Falcor
         bool dumpIR = is_set(mDesc.getCompilerFlags(), Shader::CompilerFlags::DumpIntermediates);
         spSetDumpIntermediates(slangRequest, dumpIR);
 
+        spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+
         // Pass any `#define` flags along to Slang, since we aren't doing our
         // own preprocessing any more.
         for(auto shaderDefine : mDefineList)
